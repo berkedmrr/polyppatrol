@@ -9,7 +9,6 @@
     html, body {
       margin: 0;
       padding: 0;
-      /* Allow vertical scrolling if needed */
       overflow-y: auto;
       background-color: rgb(97, 22, 37);
     }
@@ -172,7 +171,6 @@
         this.y = randRange(100, HEIGHT - 200);
         this.dx = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
         this.dy = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
-        // Rotation speed reduced to between -1 and 1 degrees per frame.
         this.rotSpeed = randRange(-1, 1);
         this.rotation = 0;
         this.particles = [];
@@ -200,7 +198,6 @@
         }
       }
       draw(ctx) {
-        // Draw particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
           this.particles[i].update();
           this.particles[i].draw(ctx);
@@ -208,13 +205,11 @@
             this.particles.splice(i, 1);
           }
         }
-        // Draw rotated image
         ctx.save();
         ctx.translate(this.x + this.size.width/2, this.y + this.size.height/2);
         ctx.rotate(this.rotation * Math.PI/180);
         ctx.drawImage(this.image, -this.size.width/2, -this.size.height/2, this.size.width, this.size.height);
         ctx.restore();
-        // Boss health bar
         if (this.ptype === "boss") {
           this.drawHealthBar(ctx);
         }
@@ -240,7 +235,6 @@
     class Poop {
       constructor() {
         this.image = images.poop;
-        // Fixed size: half the large polyp’s width (200/2 = 100)
         this.size = POLYP_TYPES.large.size.width / 2;
         this.x = randRange(100, WIDTH - 100);
         this.y = randRange(100, HEIGHT - 100);
@@ -276,8 +270,7 @@
         this.size = 50;
         this.x = randRange(100, WIDTH - 100);
         this.y = randRange(100, HEIGHT - 100);
-        this.duration = FPS * 5; // lasts 5 seconds
-        // Choose randomly from three effects.
+        this.duration = FPS * 5;
         const effects = ["extra_life", "invincibility", "slow_time"];
         this.effect = effects[Math.floor(Math.random() * effects.length)];
       }
@@ -347,22 +340,20 @@
         this.selectedPolyp = null;
         this.errorMessage = "";
         this.errorTimer = 0;
-        this.buttons = [];         // method selection buttons
-        this.gameOverButtons = []; // game over screen buttons
-        this.pauseButtons = [];    // pause menu buttons
+        this.buttons = [];
+        this.gameOverButtons = [];
+        this.pauseButtons = [];
         this.menuRect = null;
         this.comboTimer = 0;
         this.comboCount = 0;
         this.powerupSpawnTimer = FPS * 10;
         this.boss = null;
         this.invincibleTimer = 0;
-        // New slow time timer (in frames)
         this.slowTimeTimer = 0;
         this.highScore = this.loadHighScore();
         this.background = images.background;
         this.initPolyps();
         this.spawnPoops();
-        // Do not auto-play background music to comply with mobile restrictions.
         this.bindEvents();
       }
       loadHighScore() {
@@ -593,7 +584,6 @@
           this.ctx.fillText(line, WIDTH/2, y);
           y += 40;
         }
-        // Draw the "Click here to start" button 100 pixels down from its previous position.
         let buttonY = HEIGHT * 0.75 + 100;
         this.ctx.fillStyle = COLORS.primary;
         this.ctx.fillRect(WIDTH/2 - 100, buttonY, 200, 50);
@@ -633,6 +623,7 @@
         }
       }
       bindEvents() {
+        // Updated click/touch handlers to scale coordinates.
         const handleClick = (pos) => {
           if (this.state === GameState.START) {
             this.state = GameState.PLAYING;
@@ -702,17 +693,32 @@
           }
         };
 
+        // Helper function to convert event coordinates to canvas internal coordinates.
+        function getCanvasPos(e) {
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+          };
+        }
+
         canvas.addEventListener("click", (e) => {
-          let rect = canvas.getBoundingClientRect();
-          let pos = {x: e.clientX - rect.left, y: e.clientY - rect.top};
+          const pos = getCanvasPos(e);
           handleClick(pos);
         });
 
         canvas.addEventListener("touchstart", (e) => {
           e.preventDefault();
-          let touch = e.touches[0];
-          let rect = canvas.getBoundingClientRect();
-          let pos = {x: touch.clientX - rect.left, y: touch.clientY - rect.top};
+          const touch = e.touches[0];
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          const pos = {
+            x: (touch.clientX - rect.left) * scaleX,
+            y: (touch.clientY - rect.top) * scaleY
+          };
           handleClick(pos);
         }, {passive: false});
 
@@ -797,22 +803,14 @@
       }
     }
 
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const game = new Game(ctx);
-    game.run();
-  </script>
-  <script>
     // Responsive Canvas Resizing:
     function resizeCanvas() {
       const canvas = document.getElementById("gameCanvas");
-      const aspectRatio = WIDTH / HEIGHT; // 1280/720
+      const aspectRatio = WIDTH / HEIGHT;
       let windowWidth = window.innerWidth;
       let windowHeight = window.innerHeight;
-      // Calculate new dimensions preserving aspect ratio.
       let newWidth = windowWidth;
       let newHeight = windowWidth / aspectRatio;
-      // If the new height is greater than the viewport height (minus footer space), adjust:
       if (newHeight > windowHeight - 50) {
         newHeight = windowHeight - 50; // reserve 50px for footer
         newWidth = newHeight * aspectRatio;
@@ -822,6 +820,11 @@
     }
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const game = new Game(ctx);
+    game.run();
   </script>
 </body>
 </html>
