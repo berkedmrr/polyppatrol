@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Polyp Patrol - Endoscopic Master</title>
+  <style>
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background-color: rgb(97, 22, 37);
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="1280" height="720"></canvas>
+<script>
+  // Constants
+  const WIDTH = 1280;
+  const HEIGHT = 720;
+  const FPS = 60;
+  const LEVEL_THRESHOLD = 5;
+  const MAX_POLYPS = 50;
+  // Adjusted movement speed factor (lower value = slower)
+  const SPEED_FACTOR = 0.3;
+  const COLORS = {
+    text: 'rgb(255, 255, 255)',
+    primary: 'rgb(197, 67, 57)',
+    secondary: 'rgb(77, 17, 29)',
+    accent: 'rgb(255, 107, 107)',
+    background: 'rgb(97, 22, 37)',
+    pause_overlay: 'rgba(0,0,0,0.7)'
+  };
+
+  // Global variable for slow time effect (normally 1; 0.5 during slow time)
+  let slowTimeFactor = 1;
+
+  // Asset paths and audio objects
+  const assets = {
+    images: {
+      background: "assets/backgrounds/background.jpg",
+      diminutive: "assets/sprites/diminutive_polyp.png",
+      small: "assets/sprites/small_polyp.png",
+      intermediate: "assets/sprites/intermediate_polyp.png",
+      large: "assets/sprites/large_polyp.png",
+      boss: "assets/sprites/boss_polyp.png",
+      poop: "assets/sprites/poop.png",
+      powerup: "assets/sprites/powerup.png"
+    },
+    audio: {
+      background: new Audio("assets/sounds/background.mp3"),
+      correct: new Audio("assets/sounds/correct.wav"),
+      wrong: new Audio("assets/sounds/wrong.wav"),
+      select: new Audio("assets/sounds/select.wav"),
+      warning: new Audio("assets/sounds/warning.wav"),
+      powerup: new Audio("assets/sounds/powerup.wav")
+    }
+  };
+
+  // Preload images
+  const images = {};
+  for (let key in assets.images) {
+    images[key] = new Image();
+    images[key].src = assets.images[key];
+  }
+
+  // Game states
+  const GameState = {
+    START: 0,
+    PLAYING: 1,
+    PAUSED: 2,         // method selection menu
+    PAUSED_MANUAL: 3,  // player-initiated pause (via 'P')
+    GAME_OVER: 4
+  };
+
+  // Polyp type definitions with updated sizes:
+  const POLYP_TYPES = {
+    diminutive: {
+      info: "Diminutive Polyp (<5mm)\nLow cancer risk",
+      methods: ["Cold Snare", "Hot Biopsy", "Forceps", "EMR"],
+      correct: "Cold Snare",
+      size: {width: 60, height: 60},  // increased from 40×40
+      speed: 1.5
+    },
+    small: {
+      info: "Small Polyp (5-9mm)\nModerate cancer risk",
+      methods: ["Cold Snare", "Hot Snare", "Forceps", "EMR"],
+      correct: "Cold Snare",
+      size: {width: 140, height: 140}, // increased from 100×100
+      speed: 2.0
+    },
+    intermediate: {
+      info: "Intermediate Polyp (10-19mm)\nHigh cancer risk",
+      methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"],
+      correct: "EMR",
+      size: {width: 180, height: 180},
+      speed: 2.5
+    },
+    large: {
+      info: "Large Polyp (≥20mm)\nVery high cancer risk",
+      methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"],
+      correct: "ESD",
+      size: {width: 200, height: 200}, // decreased from 250×250
+      speed: 3.0
+    },
+    boss: {
+      info: "Boss Polyp!\nDefeat it for bonus points.",
+      methods: ["ESD", "Cold Snare"],
+      correct: "ESD",
+      size: {width: 400, height: 400},
+      speed: 1.0
+    }
+  };
+
+  // Helper function for random range
+  function randRange(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  // Particle class
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x;
+      this.y = y;
+      this.color = color;
+      this.size = Math.floor(randRange(3,6));
+      this.life = 40;
+      this.angle = randRange(0, Math.PI * 2);
+      this.speed = randRange(0.5, 2.5);
+    }
+    update() {
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+      this.life--;
+      this.size = Math.max(this.size - 0.1, 0);
+    }
+    draw(ctx) {
+      if (this.life > 0 && this.size > 0) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+    }
+  }
+
+  // Polyp class with slower movement and rotation
+  class Polyp {
+    constructor(ptype, speedMultiplier=1.0) {
+      this.ptype = ptype;
+      this.data = POLYP_TYPES[ptype];
+      this.image = images[ptype];
+      this.size = this.data.size;
+      this.x = randRange(100, WIDTH - 200);
+      this.y = randRange(100, HEIGHT - 200);
+      this.dx = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
+      this.dy = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
+      // Rotation speed reduced to between -1 and 1 degrees per frame.
+      this.rotSpeed = randRange(-1, 1);
+      this.rotation = 0;
+      this.particles = [];
+      if (this.ptype === "boss") {
+        this.health = 3;
+      }
+    }
+    update() {
+      this.x += this.dx * slowTimeFactor;
+      this.y += this.dy * slowTimeFactor;
+      if (this.x <= 0 || this.x + this.size.width >= WIDTH) {
+        this.dx *= -1;
+        this.generateParticles();
+      }
+      if (this.y <= 0 || this.y + this.size.height >= HEIGHT) {
+        this.dy *= -1;
+        this.generateParticles();
+      }
+      this.rotation = (this.rotation + this.rotSpeed) % 360;
+    }
+    generateParticles() {
+      for (let i = 0; i < 5; i++) {
+        const color = Math.random() < 0.5 ? COLORS.primary : COLORS.accent;
+        this.particles.push(new Particle(this.x + this.size.width/2, this.y + this.size.height/2, color));
+      }
+    }
+    draw(ctx) {
+      // Draw particles
+      for (let i = this.particles.length - 1; i >= 0; i--) {
+        this.particles[i].update();
+        this.particles[i].draw(ctx);
+        if (this.particles[i].life <= 0) {
+          this.particles.splice(i, 1);
+        }
+      }
+      // Draw rotated image
+      ctx.save();
+      ctx.translate(this.x + this.size.width/2, this.y + this.size.height/2);
+      ctx.rotate(this.rotation * Math.PI/180);
+      ctx.drawImage(this.image, -this.size.width/2, -this.size.height/2, this.size.width, this.size.height);
+      ctx.restore();
+      // Boss health bar
+      if (this.ptype === "boss") {
+        this.drawHealthBar(ctx);
+      }
+    }
+    drawHealthBar(ctx) {
+      let barWidth = this.size.width;
+      let barHeight = 10;
+      let healthPct = this.health / 3;
+      ctx.fillStyle = 'red';
+      ctx.fillRect(this.x, this.y - 20, barWidth, barHeight);
+      ctx.fillStyle = 'green';
+      ctx.fillRect(this.x, this.y - 20, barWidth * healthPct, barHeight);
+    }
+    isClicked(pos) {
+      const cx = this.x + this.size.width/2;
+      const cy = this.y + this.size.height/2;
+      const distance = Math.hypot(pos.x - cx, pos.y - cy);
+      return distance <= this.size.width/2;
+    }
+  }
+
+  // Poop class with movement slowed by slowTimeFactor
+  class Poop {
+    constructor() {
+      this.image = images.poop;
+      // Fixed size: half the large polyp’s width (200/2 = 100)
+      this.size = POLYP_TYPES.large.size.width / 2;
+      this.x = randRange(100, WIDTH - 100);
+      this.y = randRange(100, HEIGHT - 100);
+      this.angle = 0;
+      this.speed = 1;
+    }
+    update() {
+      this.x += this.speed * slowTimeFactor;
+      if (this.x + this.size/2 > WIDTH || this.x - this.size/2 < 0) {
+        this.speed *= -1;
+      }
+      this.angle = (this.angle + 5) % 360;
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle * Math.PI/180);
+      ctx.drawImage(this.image, -this.size/2, -this.size/2, this.size, this.size);
+      ctx.restore();
+    }
+    isClicked(pos) {
+      const cx = this.x;
+      const cy = this.y;
+      const distance = Math.hypot(pos.x - cx, pos.y - cy);
+      return distance <= this.size/2;
+    }
+  }
+
+  // PowerUp class with a new "slow_time" effect added.
+  class PowerUp {
+    constructor() {
+      this.image = images.powerup;
+      this.size = 50;
+      this.x = randRange(100, WIDTH - 100);
+      this.y = randRange(100, HEIGHT - 100);
+      this.duration = FPS * 5; // lasts 5 seconds
+      // Choose randomly from three effects.
+      const effects = ["extra_life", "invincibility", "slow_time"];
+      this.effect = effects[Math.floor(Math.random() * effects.length)];
+    }
+    update() {
+      this.duration--;
+    }
+    draw(ctx) {
+      ctx.drawImage(this.image, this.x, this.y, this.size, this.size);
+      ctx.strokeStyle = this.effect === "invincibility" ? 'rgb(0,191,255)' : COLORS.primary;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(this.x, this.y, this.size, this.size);
+    }
+    isClicked(pos) {
+      const cx = this.x + this.size/2;
+      const cy = this.y + this.size/2;
+      const distance = Math.hypot(pos.x - cx, pos.y - cy);
+      return distance <= this.size/2;
+    }
+  }
+
+  // Button class with a fixed click handler that checks bounds directly.
+  class Button {
+    constructor(x, y, width, height, text, callback) {
+      this.x = x;
+      this.y = y;
+      this.width = width;
+      this.height = height;
+      this.text = text;
+      this.callback = callback;
+      this.hovered = false;
+    }
+    draw(ctx) {
+      ctx.fillStyle = this.hovered ? COLORS.primary : COLORS.secondary;
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+      ctx.fillStyle = COLORS.text;
+      ctx.font = "22px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(this.text, this.x + this.width/2, this.y + this.height/2);
+    }
+    handleEvent(eventType, pos) {
+      if (eventType === "mousemove") {
+        this.hovered = (pos.x >= this.x && pos.x <= this.x + this.width &&
+                        pos.y >= this.y && pos.y <= this.y + this.height);
+      } else if (eventType === "click") {
+        if (pos.x >= this.x && pos.x <= this.x + this.width &&
+            pos.y >= this.y && pos.y <= this.y + this.height) {
+          assets.audio.select.play();
+          this.callback();
+        }
+      }
+    }
+  }
+
+  // Game class with new slowTimeTimer and fixes to button events.
+  class Game {
+    constructor(ctx) {
+      this.ctx = ctx;
+      this.state = GameState.START;
+      this.polyps = [];
+      this.poops = [];
+      this.powerups = [];
+      this.score = 0;
+      this.level = 1;
+      this.levelScore = 0;
+      this.lives = 3;
+      this.selectedPolyp = null;
+      this.errorMessage = "";
+      this.errorTimer = 0;
+      this.buttons = [];         // method selection buttons
+      this.gameOverButtons = []; // game over screen buttons
+      this.pauseButtons = [];    // pause menu buttons
+      this.menuRect = null;
+      this.comboTimer = 0;
+      this.comboCount = 0;
+      this.powerupSpawnTimer = FPS * 10;
+      this.boss = null;
+      this.invincibleTimer = 0;
+      // New slow time timer (in frames)
+      this.slowTimeTimer = 0;
+      this.highScore = this.loadHighScore();
+      this.background = images.background;
+      this.initPolyps();
+      this.spawnPoops();
+      // Do not auto-play background music to comply with mobile restrictions.
+      this.bindEvents();
+    }
+    loadHighScore() {
+      return localStorage.getItem("highscore") ? parseInt(localStorage.getItem("highscore")) : 0;
+    }
+    saveHighScore() {
+      localStorage.setItem("highscore", this.highScore);
+    }
+    initPolyps() {
+      for (let i = 0; i < 8; i++) {
+        this.spawnPolyp();
+      }
+    }
+    spawnPolyp() {
+      if (this.polyps.length >= MAX_POLYPS) return;
+      const types = Object.keys(POLYP_TYPES).filter(t => t !== "boss");
+      const ptype = types[Math.floor(Math.random() * types.length)];
+      let speedMultiplier = 1 + (this.level - 1) * 0.1;
+      this.polyps.push(new Polyp(ptype, speedMultiplier));
+    }
+    spawnPoops() {
+      this.poops = [];
+      for (let i = 0; i < this.level * 2; i++) {
+        this.poops.push(new Poop());
+      }
+    }
+    spawnPowerUp() {
+      this.powerups.push(new PowerUp());
+    }
+    resetGame() {
+      if (this.score > this.highScore) {
+        this.highScore = this.score;
+        this.saveHighScore();
+      }
+      this.polyps = [];
+      this.poops = [];
+      this.powerups = [];
+      this.score = 0;
+      this.level = 1;
+      this.levelScore = 0;
+      this.lives = 3;
+      this.selectedPolyp = null;
+      this.errorMessage = "";
+      this.errorTimer = 0;
+      this.buttons = [];
+      this.gameOverButtons = [];
+      this.pauseButtons = [];
+      this.comboTimer = 0;
+      this.comboCount = 0;
+      this.boss = null;
+      this.invincibleTimer = 0;
+      this.slowTimeTimer = 0;
+      this.initPolyps();
+      this.spawnPoops();
+      this.state = GameState.START;
+    }
+    showError(message) {
+      this.errorMessage = message;
+      this.errorTimer = FPS * 1.5;
+    }
+    handleCollisions(mousePos) {
+      // Trigger particle effects when clicking on polyps or boss
+      for (let polyp of this.polyps) {
+        if (polyp.isClicked(mousePos)) {
+          polyp.generateParticles();
+        }
+      }
+      if (this.boss && this.boss.isClicked(mousePos)) {
+        this.boss.generateParticles();
+      }
+    }
+    drawInfoPanel() {
+      // Draw a panel on the right with texts shifted 100px right (drawn at WIDTH-200)
+      this.ctx.fillStyle = "rgba(97,22,37,0.8)";
+      this.ctx.fillRect(WIDTH - 320, 0, 320, HEIGHT);
+      this.ctx.fillStyle = COLORS.text;
+      this.ctx.font = "20px sans-serif";
+      let texts = [
+        `Level: ${this.level}`,
+        `Score: ${this.score}`,
+        `Lives: ${this.lives}`,
+        `High Score: ${this.highScore}`
+      ];
+      texts.forEach((text, i) => {
+        this.ctx.fillText(text, WIDTH - 200, 30 + i * 40);
+      });
+      if (this.comboCount > 1) {
+        this.ctx.fillText(`Combo: x${this.comboCount}`, WIDTH - 200, 30 + texts.length * 40);
+      }
+      if (this.invincibleTimer > 0) {
+        this.ctx.fillText(`Invincible: ${Math.floor(this.invincibleTimer/FPS)}s`, WIDTH - 200, HEIGHT - 60);
+      }
+    }
+    handleMethodSelect(method) {
+      if (!this.selectedPolyp) {
+        this.showError("No polyp selected!");
+        return;
+      }
+      if (method === this.selectedPolyp.data.correct) {
+        assets.audio.correct.play();
+        if (this.comboTimer > 0) {
+          this.comboCount++;
+        } else {
+          this.comboCount = 1;
+        }
+        this.comboTimer = FPS * 2;
+        let bonus = (this.comboCount - 1) * 5;
+        this.score += this.level * 10 + bonus;
+        if (this.selectedPolyp.ptype === "boss") {
+          this.boss.health--;
+          if (this.boss.health <= 0) {
+            this.score += this.level * 20;
+            this.boss = null;
+          }
+        } else {
+          this.polyps = this.polyps.filter(p => p !== this.selectedPolyp);
+          this.spawnPolyp();
+        }
+        this.levelScore++;
+        if (this.levelScore >= LEVEL_THRESHOLD) {
+          this.levelUp();
+        }
+      } else {
+        assets.audio.wrong.play();
+        this.showError("Incorrect Method!");
+        if (this.invincibleTimer <= 0) {
+          this.lives--;
+        }
+        if (this.lives <= 0) {
+          this.state = GameState.GAME_OVER;
+          this.createGameOverButtons();
+        }
+      }
+      if (this.lives > 0 && this.state !== GameState.GAME_OVER) {
+        this.state = GameState.PLAYING;
+      }
+      this.selectedPolyp = null;
+    }
+    levelUp() {
+      this.level++;
+      this.levelScore = 0;
+      this.lives = Math.min(this.lives + 1, 5);
+      this.spawnPoops();
+      for (let i = 0; i < 2; i++) {
+        this.spawnPolyp();
+      }
+      if (this.level % 5 === 0) {
+        this.boss = new Polyp("boss");
+      }
+    }
+    showMethodMenu(polyp) {
+      this.state = GameState.PAUSED;
+      this.selectedPolyp = polyp;
+      let menuWidth = 400, menuHeight = 400;
+      let menuX = (WIDTH - menuWidth) / 2;
+      let menuY = (HEIGHT - menuHeight) / 2;
+      this.menuRect = {x: menuX, y: menuY, width: menuWidth, height: menuHeight};
+      this.buttons = polyp.data.methods.map((method, i) => {
+        return new Button(menuX + 40, menuY + 80 + i * (60 + 20), 200, 60, method, () => this.handleMethodSelect(method));
+      });
+    }
+    drawMethodMenu() {
+      this.ctx.fillStyle = "rgba(0,0,0,0.5)";
+      this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      if (this.selectedPolyp) {
+        let infoLines = this.selectedPolyp.data.info.split("\n");
+        let infoHeight = 30 * infoLines.length + 20;
+        this.ctx.fillStyle = "white";
+        this.ctx.fillRect(0, 0, WIDTH, infoHeight);
+        this.ctx.fillStyle = "black";
+        this.ctx.font = "20px sans-serif";
+        let y = 20;
+        for (let line of infoLines) {
+          this.ctx.fillText(line, WIDTH/2, y);
+          y += 30;
+        }
+      }
+      if (this.menuRect) {
+        this.ctx.fillStyle = COLORS.background;
+        this.ctx.fillRect(this.menuRect.x, this.menuRect.y, this.menuRect.width, this.menuRect.height);
+      }
+      this.ctx.fillStyle = COLORS.text;
+      this.ctx.font = "24px sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Select Resection Method", WIDTH/2, this.menuRect.y + 30);
+      for (let btn of this.buttons) {
+        btn.draw(this.ctx);
+      }
+    }
+    createGameOverButtons() {
+      let menuWidth = 400, menuHeight = 200;
+      let menuX = (WIDTH - menuWidth) / 2;
+      let menuY = (HEIGHT - menuHeight) / 2 + 100;
+      this.gameOverButtons = [
+        new Button(menuX + 50, menuY + 50, menuWidth - 100, 50, "Return to Main Menu", () => this.resetGame())
+      ];
+    }
+    drawGameOver() {
+      this.ctx.fillStyle = "rgba(0,0,0,0.8)";
+      this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      this.ctx.fillStyle = COLORS.accent;
+      this.ctx.font = "48px sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Game Over!", WIDTH/2, HEIGHT/2 - 50);
+      this.ctx.font = "36px sans-serif";
+      this.ctx.fillStyle = COLORS.text;
+      this.ctx.fillText(`Final Score: ${this.score}`, WIDTH/2, HEIGHT/2);
+      for (let btn of this.gameOverButtons) {
+        btn.draw(this.ctx);
+      }
+    }
+    drawTutorialMenu() {
+      // Draw a white background with tutorial text and a "Click here to start" button.
+      this.ctx.fillStyle = "white";
+      this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      this.ctx.fillStyle = "black";
+      this.ctx.font = "48px sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Polyp Patrol Tutorial", WIDTH/2, HEIGHT/4);
+      this.ctx.font = "24px sans-serif";
+      let infoLines = [
+        "Welcome to Polyp Patrol - Endoscopic Master!",
+        "Identify and remove polyps using the correct resection method.",
+        "Avoid contamination from poop obstacles.",
+        "Collect power-ups for extra life, invincibility, or slow time.",
+        "Defeat the Boss Polyp every 5 levels for huge rewards.",
+        "Build combos by removing polyps quickly."
+      ];
+      let y = HEIGHT/2 - 20;
+      for (let line of infoLines) {
+        this.ctx.fillText(line, WIDTH/2, y);
+        y += 40;
+      }
+      // Draw the "Click here to start" button 100 pixels down from its previous position.
+      let buttonY = HEIGHT * 0.75 + 100;
+      this.ctx.fillStyle = COLORS.primary;
+      this.ctx.fillRect(WIDTH/2 - 100, buttonY, 200, 50);
+      this.ctx.fillStyle = COLORS.text;
+      this.ctx.font = "24px sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.textBaseline = "middle";
+      this.ctx.fillText("Click here to start", WIDTH/2, buttonY + 25);
+    }
+    createPauseButtons() {
+      let menuWidth = 400, menuHeight = 200;
+      let menuX = (WIDTH - menuWidth) / 2;
+      let menuY = (HEIGHT - menuHeight) / 2;
+      this.pauseButtons = [
+        new Button(menuX + 50, menuY + 50, menuWidth - 100, 50, "Resume", () => this.resumeGame()),
+        new Button(menuX + 50, menuY + 120, menuWidth - 100, 50, "Main Menu", () => this.resetGame())
+      ];
+    }
+    resumeGame() {
+      this.state = GameState.PLAYING;
+      this.pauseButtons = [];
+    }
+    drawPauseMenu() {
+      this.ctx.fillStyle = COLORS.pause_overlay;
+      this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      let menuWidth = 400, menuHeight = 200;
+      let menuX = (WIDTH - menuWidth) / 2;
+      let menuY = (HEIGHT - menuHeight) / 2;
+      this.ctx.fillStyle = COLORS.background;
+      this.ctx.fillRect(menuX, menuY, menuWidth, menuHeight);
+      this.ctx.fillStyle = COLORS.text;
+      this.ctx.font = "36px sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Paused", WIDTH/2, menuY + 40);
+      for (let btn of this.pauseButtons) {
+        btn.draw(this.ctx);
+      }
+    }
+    bindEvents() {
+      // Helper function to process clicks/touches on the canvas.
+      const handleClick = (pos) => {
+        if (this.state === GameState.START) {
+          // On start screen, clicking anywhere starts the game and plays background music.
+          this.state = GameState.PLAYING;
+          assets.audio.background.loop = true;
+          assets.audio.background.play();
+          return;
+        }
+        if (this.state === GameState.PLAYING) {
+          let clickConsumed = false;
+          // Check power-ups first.
+          for (let i = 0; i < this.powerups.length; i++) {
+            if (this.powerups[i].isClicked(pos)) {
+              assets.audio.powerup.play();
+              if (this.powerups[i].effect === "extra_life") {
+                this.lives = Math.min(this.lives + 1, 5);
+                this.score += this.level * 5;
+              } else if (this.powerups[i].effect === "invincibility") {
+                this.invincibleTimer = FPS * 5;
+              } else if (this.powerups[i].effect === "slow_time") {
+                this.slowTimeTimer = FPS * 5;
+              }
+              this.powerups.splice(i, 1);
+              clickConsumed = true;
+              break;
+            }
+          }
+          // Check boss.
+          if (!clickConsumed && this.boss && this.boss.isClicked(pos)) {
+            this.showMethodMenu(this.boss);
+            clickConsumed = true;
+          }
+          // Check polyps.
+          if (!clickConsumed) {
+            for (let i = 0; i < this.polyps.length; i++) {
+              if (this.polyps[i].isClicked(pos)) {
+                this.showMethodMenu(this.polyps[i]);
+                clickConsumed = true;
+                break;
+              }
+            }
+          }
+          // Finally, check poops.
+          if (!clickConsumed) {
+            for (let i = 0; i < this.poops.length; i++) {
+              if (this.poops[i].isClicked(pos)) {
+                assets.audio.warning.play();
+                this.showError("Contamination!");
+                this.poops.splice(i, 1);
+                if (this.invincibleTimer <= 0) {
+                  this.lives--;
+                }
+                clickConsumed = true;
+                if (this.lives <= 0) {
+                  this.state = GameState.GAME_OVER;
+                  this.createGameOverButtons();
+                }
+                break;
+              }
+            }
+          }
+        } else if (this.state === GameState.PAUSED) {
+          if (this.menuRect &&
+              pos.x >= this.menuRect.x && pos.x <= this.menuRect.x + this.menuRect.width &&
+              pos.y >= this.menuRect.y && pos.y <= this.menuRect.y + this.menuRect.height) {
+            this.buttons.forEach(btn => btn.handleEvent("click", pos));
+          }
+        } else if (this.state === GameState.PAUSED_MANUAL) {
+          this.pauseButtons.forEach(btn => btn.handleEvent("click", pos));
+        } else if (this.state === GameState.GAME_OVER) {
+          this.gameOverButtons.forEach(btn => btn.handleEvent("click", pos));
+        }
+      };
+
+      // Click event for desktop/mobile.
+      canvas.addEventListener("click", (e) => {
+        let rect = canvas.getBoundingClientRect();
+        let pos = {x: e.clientX - rect.left, y: e.clientY - rect.top};
+        handleClick(pos);
+      });
+
+      // Touch event for mobile compatibility.
+      canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        let touch = e.touches[0];
+        let rect = canvas.getBoundingClientRect();
+        let pos = {x: touch.clientX - rect.left, y: touch.clientY - rect.top};
+        handleClick(pos);
+      }, {passive: false});
+
+      // Keydown events (Space still works on desktop for starting; P for pause/resume)
+      window.addEventListener("keydown", (e) => {
+        if (this.state === GameState.START && e.code === "Space") {
+          this.state = GameState.PLAYING;
+          assets.audio.background.loop = true;
+          assets.audio.background.play();
+        } else if (this.state === GameState.PLAYING && e.code === "KeyP") {
+          this.state = GameState.PAUSED_MANUAL;
+          this.createPauseButtons();
+        } else if (this.state === GameState.PAUSED_MANUAL && e.code === "KeyP") {
+          this.resumeGame();
+        }
+      });
+    }
+    update() {
+      // Update slow time factor based on slowTimeTimer.
+      if (this.slowTimeTimer > 0) {
+        this.slowTimeTimer--;
+        slowTimeFactor = 0.5;
+      } else {
+        slowTimeFactor = 1;
+      }
+      if (this.invincibleTimer > 0) {
+        this.invincibleTimer--;
+      }
+      if (this.state === GameState.PLAYING) {
+        // Update power-ups.
+        for (let i = this.powerups.length - 1; i >= 0; i--) {
+          this.powerups[i].update();
+          if (this.powerups[i].duration <= 0) {
+            this.powerups.splice(i, 1);
+          }
+        }
+        // Spawn power-ups.
+        this.powerupSpawnTimer--;
+        if (this.powerupSpawnTimer <= 0) {
+          this.spawnPowerUp();
+          this.powerupSpawnTimer = FPS * 10;
+        }
+        // Update poops.
+        this.poops.forEach(poop => { poop.update(); });
+        // Update polyps.
+        this.polyps.forEach(polyp => { polyp.update(); });
+        // Update boss if exists.
+        if (this.boss) this.boss.update();
+        if (this.comboTimer > 0) {
+          this.comboTimer--;
+        } else {
+          this.comboCount = 0;
+        }
+      }
+    }
+    draw() {
+      // Clear canvas.
+      this.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      // Draw background.
+      this.ctx.drawImage(this.background, 0, 0, WIDTH, HEIGHT);
+      if (this.state === GameState.START) {
+        this.drawTutorialMenu();
+      } else if (this.state === GameState.PLAYING) {
+        this.powerups.forEach(p => p.draw(this.ctx));
+        this.poops.forEach(p => p.draw(this.ctx));
+        this.polyps.forEach(p => p.draw(this.ctx));
+        if (this.boss) this.boss.draw(this.ctx);
+        this.drawInfoPanel();
+        if (this.errorTimer > 0) {
+          this.errorTimer--;
+          this.ctx.fillStyle = COLORS.accent;
+          this.ctx.font = "32px sans-serif";
+          this.ctx.textAlign = "center";
+          this.ctx.fillText(this.errorMessage, WIDTH/2, HEIGHT - 100);
+        }
+      } else if (this.state === GameState.PAUSED) {
+        this.drawMethodMenu();
+      } else if (this.state === GameState.PAUSED_MANUAL) {
+        this.drawPauseMenu();
+      } else if (this.state === GameState.GAME_OVER) {
+        this.drawGameOver();
+      }
+    }
+    run() {
+      const loop = () => {
+        this.update();
+        this.draw();
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+  }
+
+  // Initialize canvas and game.
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const game = new Game(ctx);
+  game.run();
+</script>
+</body>
+</html>
