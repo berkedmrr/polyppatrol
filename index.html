@@ -60,6 +60,24 @@
       z-index: 10;
       display: none;
     }
+    /* Normal view: fullscreen button moved a little up (top: 10px) */
+    #fullscreenButton {
+      position: absolute;
+      top: 10px;
+      left: 20px;
+      padding: 15px 30px;
+      font-size: 18px;
+      background: rgb(197,67,57);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      z-index: 10;
+    }
+    /* In fullscreen mode, make the button 30% larger */
+    :fullscreen #fullscreenButton {
+      padding: 12px 25px;
+      font-size: 23px;
+    }
   </style>
 </head>
 <body>
@@ -69,12 +87,24 @@
     <div class="joystick-handle" id="joystickHandle"></div>
   </div>
   <button id="hitButton">Hit</button>
+  <button id="fullscreenButton">Fullscreen</button>
   <script>
-    // Global constants
+    // Fullscreen toggle function with fullscreenchange listener for canvas resizing
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(resizeCanvas);
+      } else {
+        document.exitFullscreen().then(resizeCanvas);
+      }
+    }
+    document.getElementById("fullscreenButton").addEventListener("click", toggleFullScreen);
+    document.addEventListener("fullscreenchange", resizeCanvas);
+
+    // Global constants and game code remain unchanged
     const WIDTH = 1280;
     const HEIGHT = 720;
     const FPS = 60;
-    const LEVEL_THRESHOLD = 10; // Every 10 polyps trigger a question
+    const LEVEL_THRESHOLD = 10;
     const MAX_POLYPS = 50;
     const SPEED_FACTOR = 0.3;
     const MOVE_SPEED = 6;
@@ -90,8 +120,6 @@
     let slowTimeFactor = 1;
     let crosshairX = WIDTH/2, crosshairY = HEIGHT/2;
     let joystickInput = { x: 0, y: 0 };
-
-    // Current level time (in seconds)
     let remainingTime = 50;
 
     const assets = {
@@ -115,7 +143,6 @@
       }
     };
 
-    // Preload images
     const images = {};
     for(let key in assets.images){
       images[key] = new Image();
@@ -130,7 +157,6 @@
       QUESTION: 5
     };
 
-    // Polyps types and points
     const POLYP_TYPES = {
       diminutive: { info: "Diminutive Polyp (<5mm)\nLow cancer risk", points: 15, methods: ["Cold Snare", "Hot Biopsy", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 60, height: 60 }, speed: 1.5 },
       small: { info: "Small Polyp (5-9mm)\nModerate cancer risk", points: 10, methods: ["Cold Snare", "Hot Snare", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 140, height: 140 }, speed: 2.0 },
@@ -143,7 +169,6 @@
       return Math.random()*(max-min)+min;
     }
 
-    // Particle class for explosion effects
     class Particle {
       constructor(x, y, color){
         this.x = x;
@@ -182,7 +207,6 @@
       }
     }
 
-    // Explosion effect class
     class Explosion {
       constructor(x, y, numParticles = 400){
         this.x = x;
@@ -222,7 +246,6 @@
       }
     }
 
-    // Contamination explosion effect (red themed)
     class ContaminationExplosion {
       constructor(x, y, numParticles = 100){
         this.x = x;
@@ -261,7 +284,6 @@
       }
     }
 
-    // Polyp class
     class Polyp {
       constructor(ptype, speedMultiplier = 1.0){
         this.ptype = ptype;
@@ -316,7 +338,6 @@
       }
     }
 
-    // Poop class
     class Poop {
       constructor(){
         this.image = images.poop;
@@ -347,7 +368,6 @@
       }
     }
 
-    // PowerUp class
     class PowerUp {
       constructor(){
         this.image = images.powerup;
@@ -374,7 +394,6 @@
       }
     }
 
-    // Button class for menus
     class Button {
       constructor(x, y, width, height, text, callback){
         this.x = x;
@@ -406,7 +425,6 @@
       }
     }
 
-    // Game class
     class Game {
       constructor(ctx){
         this.ctx = ctx;
@@ -418,9 +436,8 @@
         this.score = 0;
         this.level = 1;
         this.levelScore = 0;
-        this.lives = 3; // Starts with 3 hearts/lives
+        this.lives = 3;
         this.currentQuestion = null;
-        // Expanded question bank with more and harder questions
         this.questionBank = [
           { question: "What is the most common indication for an upper GI endoscopy?", choices: ["GERD", "Dyspepsia", "Barrett's esophagus", "Esophageal cancer"], correct: "Dyspepsia" },
           { question: "Which of the following is a common complication of colonoscopy?", choices: ["Perforation", "Myocardial infarction", "Stroke", "Appendicitis"], correct: "Perforation" },
@@ -438,17 +455,13 @@
         this.bgOffsetX = 0;
         this.remainingTime = 50;
         this.lastTime = performance.now();
-        // Initialize effect timers
         this.invincibleTimer = 0;
         this.slowTimeTimer = 0;
         this.powerupSpawnTimer = FPS * 10;
-        // Error message timer
         this.errorTimer = 0;
         this.errorMessage = "";
-        // Hurry Up message timer (0.5 sec flash)
         this.hurryUpTimer = 0;
         this.hurryUpTriggered = false;
-        // Store reason for game over (e.g., time's up or wrong answer)
         this.gameOverReason = "";
         this.bindEvents();
         this.background = images.background;
@@ -508,7 +521,6 @@
       handleHit(){
         const pos = { x: crosshairX, y: crosshairY };
         let validHit = false;
-        // Check powerups
         for(let i=0; i<this.powerups.length; i++){
           if(this.powerups[i].isHit(pos)){
             assets.audio.powerup.play();
@@ -525,7 +537,6 @@
             break;
           }
         }
-        // Check boss hit
         if(!validHit && this.boss && this.boss.isHit(pos)){
           assets.audio.correct.play();
           this.explosions.push(new Explosion(this.boss.x + this.boss.size.width/2, this.boss.y + this.boss.size.height/2));
@@ -536,7 +547,6 @@
           }
           validHit = true;
         }
-        // Check polyp hit
         if(!validHit){
           for(let i=0; i<this.polyps.length; i++){
             if(this.polyps[i].isHit(pos)){
@@ -555,7 +565,6 @@
             }
           }
         }
-        // If click did not hit a powerup, boss, or polyp
         if(!validHit){
           let poopHit = false;
           for(let i=0; i<this.poops.length; i++){
@@ -568,7 +577,6 @@
             }
           }
           if(poopHit){
-            // Remove one heart for clicking a poop
             this.lives--;
             if(this.lives <= 0){
               this.gameOverReason = "Game over from contamination!";
@@ -578,7 +586,6 @@
               this.showError("Contamination!");
             }
           } else {
-            // If no poop was hit, subtract points as penalty
             this.score = Math.max(this.score - 5, 0);
             this.showError("Contamination!");
           }
@@ -627,19 +634,18 @@
       createGameOverButtons(){
         const menuWidth = 400, menuHeight = 200;
         const menuX = (WIDTH - menuWidth)/2;
-        // Move the button further down by 100 pixels
         const menuY = (HEIGHT - menuHeight)/2 + 100;
         this.gameOverButtons = [
           new Button(menuX+50, menuY+150, menuWidth-100,50, "Return to Main Menu", ()=>this.resetGame())
         ];
       }
       drawInfoPanel(){
-        // Draw larger life hearts
+        // Hearts moved down (y position set to 70)
         this.ctx.textAlign = "left";
         this.ctx.font = "bold 40px sans-serif";
         for(let i=0; i<this.lives; i++){
           this.ctx.fillStyle = "red";
-          this.ctx.fillText("♥", 20+i*45, 50);
+          this.ctx.fillText("♥", 20+i*45, 70);
         }
         this.ctx.textAlign = "right";
         this.ctx.font = "bold 40px sans-serif";
@@ -651,7 +657,6 @@
         let secondsLeft = Math.ceil(this.remainingTime);
         this.ctx.fillText("Time: " + secondsLeft, WIDTH/2, 40);
       }
-      // Crosshair: if overlapping a polyp or powerup, draw in red; otherwise white.
       drawCrosshair(){
         let color = "white";
         let pos = { x: crosshairX, y: crosshairY };
@@ -678,7 +683,6 @@
         this.ctx.lineTo(crosshairX, crosshairY+20);
         this.ctx.stroke();
       }
-      // Tutorial screen with a darker background and added point mechanic info
       drawTutorialMenu(){
         this.ctx.fillStyle = "#330000";
         this.ctx.fillRect(0,0,WIDTH,HEIGHT);
@@ -699,7 +703,6 @@
           y += 40;
         }
         const buttonY = HEIGHT*0.75+100;
-        // Draw start button on canvas (black background, white text)
         this.ctx.fillStyle = "black";
         this.ctx.fillRect(WIDTH/2 - 100, buttonY, 200, 50);
         this.ctx.fillStyle = "white";
@@ -740,7 +743,6 @@
         this.ctx.font = "36px sans-serif";
         this.ctx.fillStyle = COLORS.text;
         this.ctx.fillText(`Final Score: ${this.score}`, WIDTH/2, HEIGHT/2);
-        // Display reason for game over
         this.ctx.font = "28px sans-serif";
         this.ctx.fillStyle = COLORS.text;
         this.ctx.fillText(this.gameOverReason, WIDTH/2, HEIGHT/2 + 50);
@@ -774,7 +776,6 @@
           } else if(this.state === GameState.PAUSED_MANUAL){
             this.pauseButtons.forEach(btn => btn.handleEvent("click", pos));
           } else if(this.state === GameState.START){
-            // Start game when tutorial is clicked
             this.state = GameState.PLAYING;
             assets.audio.background.loop = true;
             assets.audio.background.play();
