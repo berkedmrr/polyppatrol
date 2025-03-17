@@ -60,7 +60,7 @@
       z-index: 10;
       display: none;
     }
-    /* Normal view: fullscreen button moved a little up (top: 10px) */
+    /* Fullscreen button styling (kept as before) */
     #fullscreenButton {
       position: absolute;
       top: 10px;
@@ -73,10 +73,9 @@
       border-radius: 8px;
       z-index: 10;
     }
-    /* In fullscreen mode, make the button 30% larger */
     :fullscreen #fullscreenButton {
-      padding: 7px 14px;
-      font-size: 9px;
+      padding: 20px 39px;
+      font-size: 23px;
     }
   </style>
 </head>
@@ -100,7 +99,7 @@
     document.getElementById("fullscreenButton").addEventListener("click", toggleFullScreen);
     document.addEventListener("fullscreenchange", resizeCanvas);
 
-    // Global constants and game code remain unchanged
+    // Global constants and game code
     const WIDTH = 1280;
     const HEIGHT = 720;
     const FPS = 60;
@@ -157,12 +156,13 @@
       QUESTION: 5
     };
 
+    // Slowed polyps: speeds reduced by 30% (i.e. multiplied by 0.7)
     const POLYP_TYPES = {
-      diminutive: { info: "Diminutive Polyp (<5mm)\nLow cancer risk", points: 15, methods: ["Cold Snare", "Hot Biopsy", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 60, height: 60 }, speed: 1.5 },
-      small: { info: "Small Polyp (5-9mm)\nModerate cancer risk", points: 10, methods: ["Cold Snare", "Hot Snare", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 140, height: 140 }, speed: 2.0 },
-      intermediate: { info: "Intermediate Polyp (10-19mm)\nHigh cancer risk", points: 5, methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"], correct: "EMR", size: { width: 180, height: 180 }, speed: 2.5 },
-      large: { info: "Large Polyp (≥20mm)\nVery high cancer risk", points: 3, methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"], correct: "ESD", size: { width: 200, height: 200 }, speed: 3.0 },
-      boss: { info: "Boss Polyp!\nDefeat it for bonus points.", methods: ["ESD", "Cold Snare"], correct: "ESD", size: { width: 400, height: 400 }, speed: 1.0 }
+      diminutive: { info: "Diminutive Polyp (<5mm)\nLow cancer risk", points: 15, methods: ["Cold Snare", "Hot Biopsy", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 60, height: 60 }, speed: 1.575 },
+      small: { info: "Small Polyp (5-9mm)\nModerate cancer risk", points: 10, methods: ["Cold Snare", "Hot Snare", "Forceps", "EMR"], correct: "Cold Snare", size: { width: 140, height: 140 }, speed: 2.1 },
+      intermediate: { info: "Intermediate Polyp (10-19mm)\nHigh cancer risk", points: 5, methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"], correct: "EMR", size: { width: 180, height: 180 }, speed: 2.625 },
+      large: { info: "Large Polyp (≥20mm)\nVery high cancer risk", points: 3, methods: ["Cold Snare", "Hot Snare", "EMR", "ESD"], correct: "ESD", size: { width: 200, height: 200 }, speed: 3.15 },
+      boss: { info: "Boss Polyp!\nDefeat it for bonus points.", methods: ["ESD", "Cold Snare"], correct: "ESD", size: { width: 400, height: 400 }, speed: 1.05 }
     };
 
     function randRange(min, max){
@@ -212,7 +212,7 @@
         this.x = x;
         this.y = y;
         this.particles = [];
-        for(let i=0;i<numParticles;i++){
+        for(let i = 0; i < numParticles; i++){
           const color = Math.random() < 0.5 ? COLORS.primary : COLORS.accent;
           this.particles.push(new Particle(x, y, color));
         }
@@ -229,7 +229,7 @@
       draw(ctx){
         if(this.shockwaveAlpha > 0){
           ctx.save();
-          let gradient = ctx.createRadialGradient(this.x, this.y, this.shockwaveRadius*0.5, this.x, this.y, this.shockwaveRadius);
+          let gradient = ctx.createRadialGradient(this.x, this.y, this.shockwaveRadius * 0.5, this.x, this.y, this.shockwaveRadius);
           gradient.addColorStop(0, `rgba(255,255,255,${this.shockwaveAlpha})`);
           gradient.addColorStop(1, 'rgba(255,255,255,0)');
           ctx.strokeStyle = gradient;
@@ -262,10 +262,10 @@
         this.particles = this.particles.filter(p => p.life > 0 && p.size > 0);
         this.shockwaveRadius += 2;
         this.shockwaveAlpha -= 0.03;
-        if (this.shockwaveAlpha < 0) this.shockwaveAlpha = 0;
+        if(this.shockwaveAlpha < 0) this.shockwaveAlpha = 0;
       }
       draw(ctx){
-        if (this.shockwaveAlpha > 0) {
+        if(this.shockwaveAlpha > 0){
           ctx.save();
           let gradient = ctx.createRadialGradient(this.x, this.y, this.shockwaveRadius * 0.5, this.x, this.y, this.shockwaveRadius);
           gradient.addColorStop(0, `rgba(255,0,0,${this.shockwaveAlpha})`);
@@ -294,7 +294,7 @@
         this.y = randRange(100, HEIGHT - 200);
         this.dx = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
         this.dy = (Math.random() < 0.5 ? -1 : 1) * this.data.speed * speedMultiplier * SPEED_FACTOR;
-        this.rotSpeed = randRange(-1,1);
+        this.rotSpeed = randRange(-1, 1);
         this.rotation = 0;
         if(this.ptype === "boss"){
           this.health = 3;
@@ -324,20 +324,21 @@
       drawHealthBar(ctx){
         let barWidth = this.size.width;
         let barHeight = 10;
-        let healthPct = this.health/3;
+        let healthPct = this.health / 3;
         ctx.fillStyle = 'red';
-        ctx.fillRect(this.x, this.y-20, barWidth, barHeight);
+        ctx.fillRect(this.x, this.y - 20, barWidth, barHeight);
         ctx.fillStyle = 'green';
-        ctx.fillRect(this.x, this.y-20, barWidth * healthPct, barHeight);
+        ctx.fillRect(this.x, this.y - 20, barWidth * healthPct, barHeight);
       }
       isHit(pos){
         const cx = this.x + this.size.width/2;
         const cy = this.y + this.size.height/2;
-        const distance = Math.hypot(pos.x-cx, pos.y-cy);
+        const distance = Math.hypot(pos.x - cx, pos.y - cy);
         return distance <= this.size.width/2;
       }
     }
 
+    // Modified Poop class: now moves in two dimensions (dx and dy) like polyps.
     class Poop {
       constructor(){
         this.image = images.poop;
@@ -345,12 +346,20 @@
         this.x = randRange(100, WIDTH - 100);
         this.y = randRange(100, HEIGHT - 100);
         this.angle = 0;
-        this.speed = 1;
+        this.speed = 2; // remains as set earlier
+        // Generate random directional components for movement.
+        this.dx = (Math.random() < 0.5 ? -1 : 1) * this.speed;
+        this.dy = (Math.random() < 0.5 ? -1 : 1) * this.speed;
       }
       update(){
-        this.x += this.speed * slowTimeFactor;
+        this.x += this.dx * slowTimeFactor;
+        this.y += this.dy * slowTimeFactor;
+        // Reverse direction when hitting canvas edges (using half size for collision)
         if(this.x + this.size/2 > WIDTH || this.x - this.size/2 < 0){
-          this.speed *= -1;
+          this.dx *= -1;
+        }
+        if(this.y + this.size/2 > HEIGHT || this.y - this.size/2 < 0){
+          this.dy *= -1;
         }
         this.angle = (this.angle + 5) % 360;
       }
@@ -363,7 +372,7 @@
       }
       isHit(pos){
         const cx = this.x, cy = this.y;
-        const distance = Math.hypot(pos.x-cx, pos.y-cy);
+        const distance = Math.hypot(pos.x - cx, pos.y - cy);
         return distance <= this.size/2;
       }
     }
@@ -389,7 +398,7 @@
       }
       isHit(pos){
         const cx = this.x + this.size/2, cy = this.y + this.size/2;
-        const distance = Math.hypot(pos.x-cx, pos.y-cy);
+        const distance = Math.hypot(pos.x - cx, pos.y - cy);
         return distance <= this.size/2;
       }
     }
@@ -411,13 +420,15 @@
         ctx.font = "22px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.text, this.x+this.width/2, this.y+this.height/2);
+        ctx.fillText(this.text, this.x + this.width/2, this.y + this.height/2);
       }
       handleEvent(eventType, pos){
-        if(eventType==="mousemove"){
-          this.hovered = (pos.x>=this.x && pos.x<=this.x+this.width && pos.y>=this.y && pos.y<=this.y+this.height);
-        } else if(eventType==="click"){
-          if(pos.x>=this.x && pos.x<=this.x+this.width && pos.y>=this.y && pos.y<=this.y+this.height){
+        if(eventType === "mousemove"){
+          this.hovered = (pos.x >= this.x && pos.x <= this.x + this.width &&
+                          pos.y >= this.y && pos.y <= this.y + this.height);
+        } else if(eventType === "click"){
+          if(pos.x >= this.x && pos.x <= this.x + this.width &&
+             pos.y >= this.y && pos.y <= this.y + this.height){
             assets.audio.select.play();
             this.callback();
           }
@@ -469,26 +480,26 @@
         this.spawnPoops();
       }
       shuffleQuestions(){
-        for(let i = this.questionBank.length-1; i>0; i--){
-          const j = Math.floor(Math.random()*(i+1));
+        for(let i = this.questionBank.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
           [this.questionBank[i], this.questionBank[j]] = [this.questionBank[j], this.questionBank[i]];
         }
       }
       initPolyps(){
-        for(let i=0;i<8;i++){
+        for(let i = 0; i < 8; i++){
           this.spawnPolyp();
         }
       }
       spawnPolyp(){
         if(this.polyps.length >= MAX_POLYPS) return;
         const types = Object.keys(POLYP_TYPES).filter(t => t !== "boss");
-        const ptype = types[Math.floor(Math.random()*types.length)];
-        let speedMultiplier = 1 + (this.level - 1)*0.1;
+        const ptype = types[Math.floor(Math.random() * types.length)];
+        let speedMultiplier = 1 + (this.level - 1) * 0.1;
         this.polyps.push(new Polyp(ptype, speedMultiplier));
       }
       spawnPoops(){
         this.poops = [];
-        for(let i=0;i<this.level*3;i++){
+        for(let i = 0; i < this.level * 3; i++){
           this.poops.push(new Poop());
         }
       }
@@ -521,18 +532,16 @@
       handleHit(){
         const pos = { x: crosshairX, y: crosshairY };
         let validHit = false;
-        for(let i=0; i<this.powerups.length; i++){
+        for(let i = 0; i < this.powerups.length; i++){
           if(this.powerups[i].isHit(pos)){
             assets.audio.powerup.play();
-            if(this.powerups[i].effect === "extra_life"){
-              this.lives = Math.min(this.lives+1,5);
-              this.score += this.level * 5;
-            } else if(this.powerups[i].effect === "invincibility"){
+            // Life gain removed from level up
+            if(this.powerups[i].effect === "invincibility"){
               this.invincibleTimer = FPS * 5;
             } else if(this.powerups[i].effect === "slow_time"){
               this.slowTimeTimer = FPS * 5;
             }
-            this.powerups.splice(i,1);
+            this.powerups.splice(i, 1);
             validHit = true;
             break;
           }
@@ -548,13 +557,13 @@
           validHit = true;
         }
         if(!validHit){
-          for(let i=0; i<this.polyps.length; i++){
+          for(let i = 0; i < this.polyps.length; i++){
             if(this.polyps[i].isHit(pos)){
               assets.audio.correct.play();
               this.explosions.push(new Explosion(this.polyps[i].x + this.polyps[i].size.width/2, this.polyps[i].y + this.polyps[i].size.height/2));
               const type = this.polyps[i].ptype;
               this.score += POLYP_TYPES[type].points;
-              this.polyps.splice(i,1);
+              this.polyps.splice(i, 1);
               this.spawnPolyp();
               this.levelScore++;
               if(this.levelScore >= LEVEL_THRESHOLD){
@@ -567,11 +576,11 @@
         }
         if(!validHit){
           let poopHit = false;
-          for(let i=0; i<this.poops.length; i++){
+          for(let i = 0; i < this.poops.length; i++){
             if(this.poops[i].isHit(pos)){
               assets.audio.warning.play();
               this.explosions.push(new ContaminationExplosion(this.poops[i].x + this.poops[i].size/2, this.poops[i].y + this.poops[i].size/2));
-              this.poops.splice(i,1);
+              this.poops.splice(i, 1);
               poopHit = true;
               break;
             }
@@ -596,29 +605,29 @@
         this.currentQuestion = this.questionBank[this.questionIndex];
         this.questionIndex++;
         const menuWidth = 400, menuHeight = 400;
-        const menuX = (WIDTH - menuWidth)/2;
-        const menuY = (HEIGHT - menuHeight)/2;
+        const menuX = (WIDTH - menuWidth) / 2;
+        const menuY = (HEIGHT - menuHeight) / 2;
         this.menuRect = { x: menuX, y: menuY, width: menuWidth, height: menuHeight };
         this.buttons = [];
-        for(let i=0; i<this.currentQuestion.choices.length; i++){
+        for(let i = 0; i < this.currentQuestion.choices.length; i++){
           let choice = this.currentQuestion.choices[i];
-          this.buttons.push(new Button(menuX+40, menuY+80+i*80,200,60, choice, ()=>this.handleQuestionAnswer(choice)));
+          this.buttons.push(new Button(menuX + 40, menuY + 80 + i * 80, 200, 60, choice, () => this.handleQuestionAnswer(choice)));
         }
       }
       handleQuestionAnswer(answer){
         if(answer === this.currentQuestion.correct){
           this.level++;
           this.levelScore = 0;
-          this.lives = Math.min(this.lives+1,5);
+          // Removed life gain on level up
           this.spawnPoops();
-          for(let i=0; i<2; i++){
+          for(let i = 0; i < 2; i++){
             this.spawnPolyp();
           }
           if(this.level % 5 === 0){
             this.boss = new Polyp("boss");
           }
           this.levelUpTimer = 90;
-          this.remainingTime = Math.max(50 - 10*(this.level-1), 20);
+          this.remainingTime = Math.max(50 - 10 * (this.level - 1), 20);
           this.hurryUpTriggered = false;
           this.hurryUpTimer = 0;
           this.state = GameState.PLAYING;
@@ -633,29 +642,29 @@
       }
       createGameOverButtons(){
         const menuWidth = 400, menuHeight = 200;
-        const menuX = (WIDTH - menuWidth)/2;
-        const menuY = (HEIGHT - menuHeight)/2 + 100;
+        const menuX = (WIDTH - menuWidth) / 2;
+        const menuY = (HEIGHT - menuHeight) / 2 + 100;
         this.gameOverButtons = [
-          new Button(menuX+50, menuY+150, menuWidth-100,50, "Return to Main Menu", ()=>this.resetGame())
+          new Button(menuX + 50, menuY + 150, menuWidth - 100, 50, "Return to Main Menu", () => this.resetGame())
         ];
       }
       drawInfoPanel(){
-        // Hearts moved down (y position set to 70)
+        // Hearts drawn a little lower (y = 70)
         this.ctx.textAlign = "left";
         this.ctx.font = "bold 40px sans-serif";
-        for(let i=0; i<this.lives; i++){
+        for(let i = 0; i < this.lives; i++){
           this.ctx.fillStyle = "red";
-          this.ctx.fillText("♥", 20+i*45, 70);
+          this.ctx.fillText("♥", 20 + i * 45, 70);
         }
         this.ctx.textAlign = "right";
         this.ctx.font = "bold 40px sans-serif";
         this.ctx.fillStyle = "white";
-        this.ctx.fillText("Score: " + this.score, WIDTH-20, 40);
+        this.ctx.fillText("Score: " + this.score, WIDTH - 20, 40);
         this.ctx.textAlign = "center";
         this.ctx.font = "bold 40px sans-serif";
         this.ctx.fillStyle = "white";
         let secondsLeft = Math.ceil(this.remainingTime);
-        this.ctx.fillText("Time: " + secondsLeft, WIDTH/2, 40);
+        this.ctx.fillText("Time: " + secondsLeft, WIDTH / 2, 40);
       }
       drawCrosshair(){
         let color = "white";
@@ -677,19 +686,19 @@
         this.ctx.strokeStyle = color;
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.moveTo(crosshairX-20, crosshairY);
-        this.ctx.lineTo(crosshairX+20, crosshairY);
-        this.ctx.moveTo(crosshairX, crosshairY-20);
-        this.ctx.lineTo(crosshairX, crosshairY+20);
+        this.ctx.moveTo(crosshairX - 20, crosshairY);
+        this.ctx.lineTo(crosshairX + 20, crosshairY);
+        this.ctx.moveTo(crosshairX, crosshairY - 20);
+        this.ctx.lineTo(crosshairX, crosshairY + 20);
         this.ctx.stroke();
       }
       drawTutorialMenu(){
         this.ctx.fillStyle = "#330000";
-        this.ctx.fillRect(0,0,WIDTH,HEIGHT);
+        this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
         this.ctx.fillStyle = "white";
         this.ctx.font = "48px sans-serif";
         this.ctx.textAlign = "center";
-        this.ctx.fillText("Polyp Patrol Tutorial", WIDTH/2, HEIGHT/4);
+        this.ctx.fillText("Polyp Patrol Tutorial", WIDTH / 2, HEIGHT / 4);
         this.ctx.font = "24px sans-serif";
         const infoLines = [
           "Use the joystick to move the crosshair.",
@@ -697,30 +706,30 @@
           "Avoid contamination – if you click on a poop or empty space, you lose 5 points.",
           "Point Mechanics: Diminutive = 15, Small = 10, Intermediate = 5, Large = 3, Boss gives bonus points."
         ];
-        let y = HEIGHT/2 - 20;
+        let y = HEIGHT / 2 - 20;
         for(let line of infoLines){
-          this.ctx.fillText(line, WIDTH/2, y);
+          this.ctx.fillText(line, WIDTH / 2, y);
           y += 40;
         }
-        const buttonY = HEIGHT*0.75+100;
+        const buttonY = HEIGHT * 0.75 + 100;
         this.ctx.fillStyle = "black";
-        this.ctx.fillRect(WIDTH/2 - 100, buttonY, 200, 50);
+        this.ctx.fillRect(WIDTH / 2 - 100, buttonY, 200, 50);
         this.ctx.fillStyle = "white";
         this.ctx.font = "24px sans-serif";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText("Click here to start", WIDTH/2, buttonY+25);
+        this.ctx.fillText("Click here to start", WIDTH / 2, buttonY + 25);
       }
       drawQuestionMenu(){
         this.ctx.fillStyle = "rgba(0,0,0,0.5)";
-        this.ctx.fillRect(0,0,WIDTH,HEIGHT);
+        this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
         const headerHeight = 100;
         this.ctx.fillStyle = "white";
-        this.ctx.fillRect(0,0,WIDTH,headerHeight);
+        this.ctx.fillRect(0, 0, WIDTH, headerHeight);
         this.ctx.fillStyle = "black";
         this.ctx.font = "20px sans-serif";
         this.ctx.textAlign = "center";
-        this.ctx.fillText(this.currentQuestion.question, WIDTH/2, headerHeight/2);
+        this.ctx.fillText(this.currentQuestion.question, WIDTH / 2, headerHeight / 2);
         if(this.menuRect){
           this.ctx.fillStyle = COLORS.background;
           this.ctx.fillRect(this.menuRect.x, this.menuRect.y, this.menuRect.width, this.menuRect.height);
@@ -728,40 +737,40 @@
         this.ctx.fillStyle = COLORS.text;
         this.ctx.font = "24px sans-serif";
         this.ctx.textAlign = "center";
-        this.ctx.fillText("Select Answer", WIDTH/2, this.menuRect.y+30);
+        this.ctx.fillText("Select Answer", WIDTH / 2, this.menuRect.y + 30);
         for(let btn of this.buttons){
           btn.draw(this.ctx);
         }
       }
       drawGameOver(){
         this.ctx.fillStyle = "rgba(0,0,0,0.8)";
-        this.ctx.fillRect(0,0,WIDTH,HEIGHT);
+        this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
         this.ctx.fillStyle = COLORS.accent;
         this.ctx.font = "48px sans-serif";
         this.ctx.textAlign = "center";
-        this.ctx.fillText("Game Over!", WIDTH/2, HEIGHT/2-50);
+        this.ctx.fillText("Game Over!", WIDTH / 2, HEIGHT / 2 - 50);
         this.ctx.font = "36px sans-serif";
         this.ctx.fillStyle = COLORS.text;
-        this.ctx.fillText(`Final Score: ${this.score}`, WIDTH/2, HEIGHT/2);
+        this.ctx.fillText(`Final Score: ${this.score}`, WIDTH / 2, HEIGHT / 2);
         this.ctx.font = "28px sans-serif";
         this.ctx.fillStyle = COLORS.text;
-        this.ctx.fillText(this.gameOverReason, WIDTH/2, HEIGHT/2 + 50);
+        this.ctx.fillText(this.gameOverReason, WIDTH / 2, HEIGHT / 2 + 50);
         for(let btn of this.gameOverButtons){
           btn.draw(this.ctx);
         }
       }
       drawPauseMenu(){
         this.ctx.fillStyle = COLORS.pause_overlay;
-        this.ctx.fillRect(0,0,WIDTH,HEIGHT);
+        this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
         const menuWidth = 400, menuHeight = 200;
-        const menuX = (WIDTH-menuWidth)/2;
-        const menuY = (HEIGHT-menuHeight)/2;
+        const menuX = (WIDTH - menuWidth) / 2;
+        const menuY = (HEIGHT - menuHeight) / 2;
         this.ctx.fillStyle = COLORS.background;
         this.ctx.fillRect(menuX, menuY, menuWidth, menuHeight);
         this.ctx.fillStyle = COLORS.text;
         this.ctx.font = "36px sans-serif";
         this.ctx.textAlign = "center";
-        this.ctx.fillText("Paused", WIDTH/2, menuY+40);
+        this.ctx.fillText("Paused", WIDTH / 2, menuY + 40);
         for(let btn of this.pauseButtons){
           btn.draw(this.ctx);
         }
@@ -782,25 +791,25 @@
           }
         };
 
-        canvas.addEventListener("click", (e)=>{
+        canvas.addEventListener("click", (e) => {
           let rect = canvas.getBoundingClientRect();
-          let scaleX = canvas.width/rect.width;
-          let scaleY = canvas.height/rect.height;
-          let pos = { x: (e.clientX - rect.left)*scaleX, y: (e.clientY - rect.top)*scaleY };
+          let scaleX = canvas.width / rect.width;
+          let scaleY = canvas.height / rect.height;
+          let pos = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
           handleClick(pos);
         });
 
-        canvas.addEventListener("touchstart", (e)=>{
+        canvas.addEventListener("touchstart", (e) => {
           e.preventDefault();
           let touch = e.touches[0];
           let rect = canvas.getBoundingClientRect();
-          let scaleX = canvas.width/rect.width;
-          let scaleY = canvas.height/rect.height;
-          let pos = { x: (touch.clientX - rect.left)*scaleX, y: (touch.clientY - rect.top)*scaleY };
+          let scaleX = canvas.width / rect.width;
+          let scaleY = canvas.height / rect.height;
+          let pos = { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
           handleClick(pos);
         }, { passive: false });
 
-        window.addEventListener("keydown", (e)=>{
+        window.addEventListener("keydown", (e) => {
           if(this.state === GameState.START && e.code === "Space"){
             this.state = GameState.PLAYING;
             assets.audio.background.loop = true;
@@ -850,10 +859,10 @@
           this.invincibleTimer--;
         }
         if(this.state === GameState.PLAYING){
-          for(let i=this.powerups.length-1; i>=0; i--){
+          for(let i = this.powerups.length - 1; i >= 0; i--){
             this.powerups[i].update();
             if(this.powerups[i].duration <= 0){
-              this.powerups.splice(i,1);
+              this.powerups.splice(i, 1);
             }
           }
           this.powerupSpawnTimer--;
@@ -861,8 +870,8 @@
             this.spawnPowerUp();
             this.powerupSpawnTimer = FPS * 10;
           }
-          this.poops.forEach(poop=>{ poop.update(); });
-          this.polyps.forEach(polyp=>{ polyp.update(); });
+          this.poops.forEach(poop => { poop.update(); });
+          this.polyps.forEach(polyp => { polyp.update(); });
           if(this.boss) this.boss.update();
         }
         this.explosions.forEach(exp => exp.update());
@@ -878,7 +887,7 @@
         }
       }
       draw(){
-        this.ctx.clearRect(0,0,WIDTH,HEIGHT);
+        this.ctx.clearRect(0, 0, WIDTH, HEIGHT);
         if(this.background && this.background.complete){
           for(let x = this.bgOffsetX - this.background.width; x < WIDTH; x += this.background.width){
             this.ctx.drawImage(this.background, x, 0, this.background.width, HEIGHT);
@@ -902,7 +911,7 @@
             this.ctx.font = "bold 50px monospace";
             this.ctx.fillStyle = "white";
             this.ctx.textAlign = "center";
-            this.ctx.fillText("LEVEL UP!", WIDTH/2, HEIGHT/2);
+            this.ctx.fillText("LEVEL UP!", WIDTH / 2, HEIGHT / 2);
             this.ctx.restore();
           }
           if(this.hurryUpTimer > 0){
@@ -911,15 +920,15 @@
             let alpha = this.hurryUpTimer / (FPS * 0.5);
             this.ctx.fillStyle = "rgba(255,255,0," + alpha + ")";
             this.ctx.textAlign = "center";
-            this.ctx.fillText("Hurry up!", WIDTH/2, HEIGHT/2 - 100);
+            this.ctx.fillText("Hurry up!", WIDTH / 2, HEIGHT / 2 - 100);
             this.ctx.restore();
           }
           if(this.errorTimer > 0 && this.errorMessage){
             this.ctx.save();
             this.ctx.font = "bold 60px sans-serif";
-            this.ctx.fillStyle = "rgba(255,0,0," + (this.errorTimer/(FPS*1.5)) + ")";
+            this.ctx.fillStyle = "rgba(255,0,0," + (this.errorTimer / (FPS * 1.5)) + ")";
             this.ctx.textAlign = "center";
-            this.ctx.fillText(this.errorMessage, WIDTH/2, HEIGHT/2);
+            this.ctx.fillText(this.errorMessage, WIDTH / 2, HEIGHT / 2);
             this.ctx.restore();
           }
         } else if(this.state === GameState.QUESTION){
@@ -944,34 +953,34 @@
 
     const joystick = document.getElementById('joystick');
     const joystickHandle = document.getElementById('joystickHandle');
-    const maxDistance = joystick.offsetWidth/2;
+    const maxDistance = joystick.offsetWidth / 2;
     let joystickActive = false;
 
     function getNormalizedVector(dx, dy){
-      const distance = Math.hypot(dx,dy);
+      const distance = Math.hypot(dx, dy);
       const clamped = Math.min(distance, maxDistance);
-      const angle = Math.atan2(dy,dx);
+      const angle = Math.atan2(dy, dx);
       return {
-        x: (clamped*Math.cos(angle))/maxDistance,
-        y: (clamped*Math.sin(angle))/maxDistance
+        x: (clamped * Math.cos(angle)) / maxDistance,
+        y: (clamped * Math.sin(angle)) / maxDistance
       };
     }
 
     function updateJoystick(clientX, clientY){
       const rect = joystick.getBoundingClientRect();
-      const centerX = rect.left+rect.width/2;
-      const centerY = rect.top+rect.height/2;
-      const dx = clientX-centerX;
-      const dy = clientY-centerY;
-      const distance = Math.hypot(dx,dy);
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
+      const distance = Math.hypot(dx, dy);
       let limitedX = dx, limitedY = dy;
       if(distance > maxDistance){
-        const angle = Math.atan2(dy,dx);
-        limitedX = Math.cos(angle)*maxDistance;
-        limitedY = Math.sin(angle)*maxDistance;
+        const angle = Math.atan2(dy, dx);
+        limitedX = Math.cos(angle) * maxDistance;
+        limitedY = Math.sin(angle) * maxDistance;
       }
       joystickHandle.style.transform = `translate(${limitedX}px, ${limitedY}px)`;
-      joystickInput = getNormalizedVector(dx,dy);
+      joystickInput = getNormalizedVector(dx, dy);
       console.log('Joystick:', joystickInput);
     }
 
@@ -980,51 +989,51 @@
       joystickInput = { x: 0, y: 0 };
     }
 
-    joystick.addEventListener('touchstart', (e)=>{
+    joystick.addEventListener('touchstart', (e) => {
       joystickActive = true;
       const touch = e.changedTouches[0];
       updateJoystick(touch.clientX, touch.clientY);
       e.preventDefault();
     });
-    joystick.addEventListener('touchmove', (e)=>{
-      if(!joystickActive)return;
+    joystick.addEventListener('touchmove', (e) => {
+      if(!joystickActive) return;
       const touch = e.changedTouches[0];
       updateJoystick(touch.clientX, touch.clientY);
       e.preventDefault();
     });
-    joystick.addEventListener('touchend', (e)=>{
+    joystick.addEventListener('touchend', (e) => {
       joystickActive = false;
       resetJoystick();
       e.preventDefault();
     });
-    joystick.addEventListener('mousedown', (e)=>{
+    joystick.addEventListener('mousedown', (e) => {
       joystickActive = true;
       updateJoystick(e.clientX, e.clientY);
       e.preventDefault();
     });
-    window.addEventListener('mousemove', (e)=>{
-      if(!joystickActive)return;
+    window.addEventListener('mousemove', (e) => {
+      if(!joystickActive) return;
       updateJoystick(e.clientX, e.clientY);
     });
-    window.addEventListener('mouseup', (e)=>{
+    window.addEventListener('mouseup', (e) => {
       if(joystickActive){
         joystickActive = false;
         resetJoystick();
       }
     });
-    document.getElementById("hitButton").addEventListener("click", ()=>{
+    document.getElementById("hitButton").addEventListener("click", () => {
       game.handleHit();
     });
     function resizeCanvas(){
       const canvas = document.getElementById("gameCanvas");
       const gameWidth = 1280;
       const gameHeight = 720;
-      const scale = Math.min(window.innerWidth/gameWidth, window.innerHeight/gameHeight);
+      const scale = Math.min(window.innerWidth / gameWidth, window.innerHeight / gameHeight);
       canvas.style.transform = `scale(${scale})`;
       canvas.style.transformOrigin = "top left";
       canvas.style.position = "absolute";
-      canvas.style.left = `${(window.innerWidth - gameWidth*scale)/2}px`;
-      canvas.style.top = `${(window.innerHeight - gameHeight*scale)/2}px`;
+      canvas.style.left = `${(window.innerWidth - gameWidth * scale) / 2}px`;
+      canvas.style.top = `${(window.innerHeight - gameHeight * scale) / 2}px`;
     }
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
